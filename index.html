@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KAI 財務報表</title>
+    <title>KAI 財務報表</title> 
+    
+    <meta name="apple-mobile-web-app-title" content="KAI 財務報表">
 
     <link rel="icon" type="image/png" href="https://i.imgur.com/xuQDB62.png">
     <link rel="apple-touch-icon" href="https://i.imgur.com/xuQDB62.png">
@@ -15,7 +17,6 @@
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background-color: #0f172a; font-family: sans-serif; overflow: hidden; }
         
-        /* 登入層樣式 */
         #login-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -38,8 +39,14 @@
         }
         button:active { opacity: 0.8; }
 
-        /* iframe 全螢幕 */
         iframe { width: 100%; height: 100%; border: none; display: none; }
+
+        #reset-btn {
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.5);
+            padding: 5px 10px; border-radius: 5px; font-size: 12px;
+            cursor: pointer; z-index: 999; border: 1px solid rgba(255, 255, 255, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -50,47 +57,77 @@
             <h2 style="color:#fff; margin-bottom: 20px; font-weight:600;">SECURITY CHECK</h2>
             <input type="password" id="passInput" placeholder="Enter Access Code">
             <br>
-            <button onclick="enterApp()">ENTER</button>
+            <button onclick="processLogin()">ENTER</button>
         </div>
     </div>
 
     <iframe id="appFrame"></iframe>
+    <div id="reset-btn" onclick="resetApp()">🔄 重設登入</div>
 
     <script>
-        // ★★★ 請修改這裡：填入你的 GAS 網址 (不要帶 ?p=...) ★★★
-        // 結尾應該是 /exec
+        // ★★★ 請填入你的 GAS 正式版網址 ★★★
         var GAS_URL = "https://script.google.com/macros/s/AKfycbxeeTe0KiCHYeEfkwskSytNdpCYo-_WKsIpVHby0VSH0dNNtZ5Mc8cm6-raitDJF78b/exec";
 
-        // 自動檢查：如果瀏覽器有記住密碼，自動登入
         window.onload = function() {
             var savedPass = localStorage.getItem("kai_app_pass");
             if (savedPass) {
+                // 如果有存密碼，直接載入 iframe，同時背景發送紀錄
                 loadIframe(savedPass);
+                logToGAS(savedPass); 
             }
         };
 
-        function enterApp() {
+        // 處理登入動作
+        function processLogin() {
             var p = document.getElementById("passInput").value;
             if (p) {
-                // 記住密碼，下次不用再打 (像原生App一樣)
                 localStorage.setItem("kai_app_pass", p);
+                
+                // 1. 載入畫面 (讓使用者覺得很快)
                 loadIframe(p);
+                
+                // 2. 背景紀錄 (抓IP並回傳GAS)
+                logToGAS(p);
             }
         }
 
+        // 載入 iframe 的邏輯 (純畫面)
         function loadIframe(password) {
             var frame = document.getElementById("appFrame");
             var login = document.getElementById("login-layer");
 
-            // 1. 組合網址：GAS網址 + ?p=密碼
             frame.src = GAS_URL + "?p=" + password;
-            
-            // 2. 顯示 iframe
             frame.style.display = "block";
             
-            // 3. 隱藏登入層 (淡出效果)
             login.style.opacity = "0";
             setTimeout(() => { login.style.display = "none"; }, 500);
+        }
+
+        // ★ 新增：背景紀錄邏輯
+        function logToGAS(password) {
+            // 1. 先去問 ipify 抓 IP
+            fetch('https://api.ipify.org?format=json')
+                .then(response => response.json())
+                .then(data => {
+                    var userIp = data.ip;
+                    // 2. 抓到 IP 後，發送訊號給 GAS (模式=log)
+                    // 使用 no-cors 模式，因為我們只管發送，不在乎回傳值
+                    var logUrl = GAS_URL + "?mode=log&p=" + encodeURIComponent(password) + "&ip=" + userIp;
+                    fetch(logUrl, { mode: 'no-cors' });
+                })
+                .catch(err => {
+                    console.log("IP fetch failed", err);
+                    // 就算抓不到 IP，也硬送一次紀錄
+                    var logUrl = GAS_URL + "?mode=log&p=" + encodeURIComponent(password) + "&ip=Unknown";
+                    fetch(logUrl, { mode: 'no-cors' });
+                });
+        }
+
+        function resetApp() {
+            if(confirm("確定要清除記憶的密碼並重新登入嗎？")) {
+                localStorage.removeItem("kai_app_pass");
+                location.reload();
+            }
         }
     </script>
 </body>
