@@ -13,6 +13,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
+
+    <link rel="preconnect" href="https://script.google.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     
     <style>
         body, html { margin: 0; padding: 0; height: 100%; background-color: #0f172a; font-family: sans-serif; overflow: hidden; }
@@ -20,7 +25,7 @@
         #login-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 10; background-color: #0f172a; transition: opacity 0.5s;
+            z-index: 20; background-color: #0f172a; transition: opacity 0.5s;
         }
         
         .login-box { text-align: center; }
@@ -39,24 +44,35 @@
         }
         button:active { opacity: 0.8; }
 
-        iframe { width: 100%; height: 100%; border: none; display: none; }
+        iframe { width: 100%; height: 100%; border: none; display: none; z-index: 10; }
 
-        /* ★ 重設按鈕樣式 (右下角) */
         #reset-btn {
             position: absolute; bottom: 20px; right: 20px;
             background: rgba(0, 0, 0, 0.5); color: rgba(255, 255, 255, 0.6);
             padding: 6px 12px; border-radius: 20px; font-size: 12px;
             cursor: pointer; z-index: 999; border: 1px solid rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(4px);
-            transition: opacity 1s, visibility 1s; /* 淡出動畫 */
+            transition: opacity 1s, visibility 1s;
         }
+        .hidden-btn { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        /* ★ 新增：載入中動畫 (Loading Spinner) */
+        #loading-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; /* 預設隱藏，登入後顯示 */
+            flex-direction: column; justify-content: center; align-items: center;
+            z-index: 15; background-color: #0f172a;
+        }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid rgba(56, 189, 248, 0.3);
+            border-top: 4px solid #38bdf8; border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 15px;
+        }
+        .loading-text { color: #94a3b8; font-size: 14px; letter-spacing: 1px; animation: pulse 1.5s infinite; }
         
-        /* 隱藏狀態 */
-        .hidden-btn {
-            opacity: 0;
-            visibility: hidden; /* 確保隱藏後點不到 */
-            pointer-events: none;
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
     </style>
 </head>
 <body>
@@ -71,17 +87,23 @@
         </div>
     </div>
 
-    <iframe id="appFrame"></iframe>
+    <div id="loading-layer">
+        <div class="spinner"></div>
+        <div class="loading-text">CONNECTING TO HQ...</div>
+    </div>
+
+    <iframe id="appFrame" onload="onFrameLoaded()"></iframe>
     
     <div id="reset-btn" onclick="resetApp()">🔄 重設登入</div>
 
     <script>
-        // ★★★ 請確認這是你的 GAS 網址 ★★★
         var GAS_URL = "https://script.google.com/macros/s/AKfycbxeeTe0KiCHYeEfkwskSytNdpCYo-_WKsIpVHby0VSH0dNNtZ5Mc8cm6-raitDJF78b/exec";
 
         window.onload = function() {
             var savedPass = localStorage.getItem("kai_app_pass");
             if (savedPass) {
+                // 自動登入：顯示 Loading，隱藏登入框
+                showLoading();
                 loadIframe(savedPass);
                 logToGAS(savedPass); 
             }
@@ -91,27 +113,39 @@
             var p = document.getElementById("passInput").value;
             if (p) {
                 localStorage.setItem("kai_app_pass", p);
+                showLoading();
                 loadIframe(p);
                 logToGAS(p);
             }
         }
 
+        function showLoading() {
+            document.getElementById("login-layer").style.display = "none";
+            document.getElementById("loading-layer").style.display = "flex";
+        }
+
         function loadIframe(password) {
             var frame = document.getElementById("appFrame");
-            var login = document.getElementById("login-layer");
-
+            // 這裡不直接 block，等 onload 事件觸發才顯示
             frame.src = GAS_URL + "?p=" + password;
-            frame.style.display = "block";
             
-            login.style.opacity = "0";
-            setTimeout(() => { login.style.display = "none"; }, 500);
-
-            // ★★★ 關鍵功能：10秒後自動隱藏重設按鈕 ★★★
-            // 這樣畫面就會變乾淨，但如果你真的卡住，重整頁面它又會出現
+            // 10秒後隱藏重設按鈕
             setTimeout(() => {
                 var btn = document.getElementById("reset-btn");
                 if(btn) btn.classList.add("hidden-btn");
-            }, 10000); // 10000毫秒 = 10秒
+            }, 10000);
+        }
+
+        // ★ 關鍵：當 GAS 終於跑完 HTML 回傳給瀏覽器時，觸發此函式
+        function onFrameLoaded() {
+            var frame = document.getElementById("appFrame");
+            var loader = document.getElementById("loading-layer");
+            
+            // 只有當 iframe 真的有內容時才切換
+            if (frame.src) {
+                loader.style.display = "none"; // 隱藏轉圈圈
+                frame.style.display = "block"; // 顯示戰情室
+            }
         }
 
         function logToGAS(password) {
