@@ -13,11 +13,85 @@
     <meta name="theme-color" content="#0f172a">
     
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #0f172a; }
-        iframe { width: 100%; height: 100%; border: none; display: block; }
+        body, html { margin: 0; padding: 0; height: 100%; background-color: #0f172a; font-family: sans-serif; overflow: hidden; }
+        
+        /* 登入層樣式 */
+        #login-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 10; background-color: #0f172a; transition: opacity 0.5s;
+        }
+        
+        .login-box { text-align: center; }
+        .logo { width: 80px; height: 80px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 0 20px rgba(56, 189, 248, 0.3); }
+        
+        input {
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px; border-radius: 8px; color: white; font-size: 16px; text-align: center;
+            width: 200px; margin-bottom: 15px; outline: none;
+        }
+        input:focus { border-color: #38bdf8; }
+        
+        button {
+            background: #38bdf8; color: #0f172a; border: none; padding: 10px 20px;
+            border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; width: 220px;
+        }
+        button:active { opacity: 0.8; }
+
+        /* iframe 全螢幕 */
+        iframe { width: 100%; height: 100%; border: none; display: none; }
     </style>
 </head>
 <body>
-    <iframe src="https://script.google.com/macros/s/AKfycbxeeTe0KiCHYeEfkwskSytNdpCYo-_WKsIpVHby0VSH0dNNtZ5Mc8cm6-raitDJF78b/exec?p=kai-9976-cc-0706"></iframe>
+
+    <div id="login-layer">
+        <div class="login-box">
+            <img src="https://i.imgur.com/xuQDB62.png" class="logo">
+            <h2 style="color:#fff; margin-bottom: 20px; font-weight:600;">SECURITY CHECK</h2>
+            <input type="password" id="passInput" placeholder="Enter Access Code">
+            <br>
+            <button onclick="enterApp()">ENTER</button>
+        </div>
+    </div>
+
+    <iframe id="appFrame"></iframe>
+
+    <script>
+        // ★★★ 請修改這裡：填入你的 GAS 網址 (不要帶 ?p=...) ★★★
+        // 結尾應該是 /exec
+        var GAS_URL = "https://script.google.com/macros/s/AKfycbxeeTe0KiCHYeEfkwskSytNdpCYo-_WKsIpVHby0VSH0dNNtZ5Mc8cm6-raitDJF78b/exec";
+
+        // 自動檢查：如果瀏覽器有記住密碼，自動登入
+        window.onload = function() {
+            var savedPass = localStorage.getItem("kai_app_pass");
+            if (savedPass) {
+                loadIframe(savedPass);
+            }
+        };
+
+        function enterApp() {
+            var p = document.getElementById("passInput").value;
+            if (p) {
+                // 記住密碼，下次不用再打 (像原生App一樣)
+                localStorage.setItem("kai_app_pass", p);
+                loadIframe(p);
+            }
+        }
+
+        function loadIframe(password) {
+            var frame = document.getElementById("appFrame");
+            var login = document.getElementById("login-layer");
+
+            // 1. 組合網址：GAS網址 + ?p=密碼
+            frame.src = GAS_URL + "?p=" + password;
+            
+            // 2. 顯示 iframe
+            frame.style.display = "block";
+            
+            // 3. 隱藏登入層 (淡出效果)
+            login.style.opacity = "0";
+            setTimeout(() => { login.style.display = "none"; }, 500);
+        }
+    </script>
 </body>
 </html>
