@@ -41,11 +41,21 @@
 
         iframe { width: 100%; height: 100%; border: none; display: none; }
 
+        /* ★ 重設按鈕樣式 (右下角) */
         #reset-btn {
             position: absolute; bottom: 20px; right: 20px;
-            background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.5);
-            padding: 5px 10px; border-radius: 5px; font-size: 12px;
-            cursor: pointer; z-index: 999; border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.5); color: rgba(255, 255, 255, 0.6);
+            padding: 6px 12px; border-radius: 20px; font-size: 12px;
+            cursor: pointer; z-index: 999; border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(4px);
+            transition: opacity 1s, visibility 1s; /* 淡出動畫 */
+        }
+        
+        /* 隱藏狀態 */
+        .hidden-btn {
+            opacity: 0;
+            visibility: hidden; /* 確保隱藏後點不到 */
+            pointer-events: none;
         }
     </style>
 </head>
@@ -62,36 +72,30 @@
     </div>
 
     <iframe id="appFrame"></iframe>
+    
     <div id="reset-btn" onclick="resetApp()">🔄 重設登入</div>
 
     <script>
-        // ★★★ 請填入你的 GAS 正式版網址 ★★★
+        // ★★★ 請確認這是你的 GAS 網址 ★★★
         var GAS_URL = "https://script.google.com/macros/s/AKfycbxeeTe0KiCHYeEfkwskSytNdpCYo-_WKsIpVHby0VSH0dNNtZ5Mc8cm6-raitDJF78b/exec";
 
         window.onload = function() {
             var savedPass = localStorage.getItem("kai_app_pass");
             if (savedPass) {
-                // 如果有存密碼，直接載入 iframe，同時背景發送紀錄
                 loadIframe(savedPass);
                 logToGAS(savedPass); 
             }
         };
 
-        // 處理登入動作
         function processLogin() {
             var p = document.getElementById("passInput").value;
             if (p) {
                 localStorage.setItem("kai_app_pass", p);
-                
-                // 1. 載入畫面 (讓使用者覺得很快)
                 loadIframe(p);
-                
-                // 2. 背景紀錄 (抓IP並回傳GAS)
                 logToGAS(p);
             }
         }
 
-        // 載入 iframe 的邏輯 (純畫面)
         function loadIframe(password) {
             var frame = document.getElementById("appFrame");
             var login = document.getElementById("login-layer");
@@ -101,23 +105,24 @@
             
             login.style.opacity = "0";
             setTimeout(() => { login.style.display = "none"; }, 500);
+
+            // ★★★ 關鍵功能：10秒後自動隱藏重設按鈕 ★★★
+            // 這樣畫面就會變乾淨，但如果你真的卡住，重整頁面它又會出現
+            setTimeout(() => {
+                var btn = document.getElementById("reset-btn");
+                if(btn) btn.classList.add("hidden-btn");
+            }, 10000); // 10000毫秒 = 10秒
         }
 
-        // ★ 新增：背景紀錄邏輯
         function logToGAS(password) {
-            // 1. 先去問 ipify 抓 IP
             fetch('https://api.ipify.org?format=json')
                 .then(response => response.json())
                 .then(data => {
                     var userIp = data.ip;
-                    // 2. 抓到 IP 後，發送訊號給 GAS (模式=log)
-                    // 使用 no-cors 模式，因為我們只管發送，不在乎回傳值
                     var logUrl = GAS_URL + "?mode=log&p=" + encodeURIComponent(password) + "&ip=" + userIp;
                     fetch(logUrl, { mode: 'no-cors' });
                 })
                 .catch(err => {
-                    console.log("IP fetch failed", err);
-                    // 就算抓不到 IP，也硬送一次紀錄
                     var logUrl = GAS_URL + "?mode=log&p=" + encodeURIComponent(password) + "&ip=Unknown";
                     fetch(logUrl, { mode: 'no-cors' });
                 });
